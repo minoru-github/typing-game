@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { GROUPS } from '../src/data/groups';
 import { Mode, NETHER_STAGES, TEMPLATES, buildQuestions, modeKey, practiceQuestions } from '../src/questions';
-import { areaModes, isUnlocked } from '../src/progress';
+import { areaModes, isModeUnlocked, newlyUnlocked, requirementProgress } from '../src/progress';
 import { Best, migrateBests } from '../src/storage';
 import { TypingSession } from '../src/session';
 import { findKey } from '../src/keyboard';
@@ -114,29 +114,57 @@ describe('問題づくり', () => {
 
 describe('かいほう', () => {
   const best = (rankId: string): Best => ({ score: 1, rankId, kpm: 1, accuracy: 1 });
-  const all = (area: 'overworld' | 'nether', rankId: string) =>
-    Object.fromEntries(areaModes(area).map((m) => [modeKey(m), best(rankId)]));
+
+  const stage = (n: number): Mode => ({ kind: 'nether', stage: n });
+  const end: Mode = { kind: 'end' };
 
   it('はじめは オーバーワールドだけ', () => {
-    expect(isUnlocked({}, 'overworld')).toBe(true);
-    expect(isUnlocked({}, 'nether')).toBe(false);
-    expect(isUnlocked({}, 'end')).toBe(false);
+    for (const m of areaModes('overworld')) expect(isModeUnlocked({}, m)).toBe(true);
+    for (const m of areaModes('nether')) expect(isModeUnlocked({}, m)).toBe(false);
+    expect(isModeUnlocked({}, end)).toBe(false);
   });
-  it('オーバーワールドを ぜんぶ ゴールド いじょうで ネザーが ひらく', () => {
-    const bests = { ...all('overworld', 'gold'), 'overworld:items': best('netherite') };
-    expect(isUnlocked(bests, 'nether')).toBe(true);
-    expect(isUnlocked(bests, 'end')).toBe(false);
+  it('ステージの くみあわせと なまえ', () => {
+    expect(NETHER_STAGES.map((s) => [s.name, ...s.groups])).toEqual([
+      ['真紅の森', 'commands', 'items'],
+      ['歪んだ森', 'blocks', 'entities'],
+      ['ネザーの荒野', 'effects', 'enchantments'],
+      ['ソウルサンドの谷', 'biomes', 'gamerules'],
+    ]);
   });
-  it('ひとつでも アイアンだと ひらかない', () => {
-    const bests = { ...all('overworld', 'gold'), 'overworld:items': best('iron') };
-    expect(isUnlocked(bests, 'nether')).toBe(false);
-    const missing = all('overworld', 'diamond');
-    delete missing['overworld:biomes'];
-    expect(isUnlocked(missing, 'nether')).toBe(false);
+  it('真紅の森は コマンドと アイテムを ゴールド いじょうで ひらく', () => {
+    const bests = { 'overworld:commands': best('gold'), 'overworld:items': best('diamond') };
+    expect(isModeUnlocked(bests, stage(0))).toBe(true);
+    // ほかの ステージは まだ
+    for (const n of [1, 2, 3]) expect(isModeUnlocked(bests, stage(n))).toBe(false);
   });
-  it('ネザーも ぜんぶ ゴールド いじょうで エンドシティが ひらく', () => {
-    expect(isUnlocked({ ...all('overworld', 'gold'), ...all('nether', 'diamond') }, 'end')).toBe(true);
-    expect(isUnlocked({ ...all('overworld', 'gold'), ...all('nether', 'stone') }, 'end')).toBe(false);
+  it('ステージの 2グループの どちらかが たりないと ひらかない', () => {
+    expect(isModeUnlocked({ 'overworld:commands': best('gold') }, stage(0))).toBe(false);
+    expect(isModeUnlocked({ 'overworld:commands': best('gold'), 'overworld:items': best('iron') }, stage(0))).toBe(false);
+  });
+  it('どの ステージも ペアの オーバーワールドで ひらく', () => {
+    NETHER_STAGES.forEach((s, n) => {
+      const bests = Object.fromEntries(s.groups.map((g) => [`overworld:${g}`, best('netherite')]));
+      expect(isModeUnlocked(bests, stage(n))).toBe(true);
+    });
+  });
+  it('ネザーを 3つ いじょう ゴールド いじょうで エンドシティが ひらく', () => {
+    const nether = (ranks: string[]) => Object.fromEntries(ranks.map((r, n) => [`nether:${n}`, best(r)]));
+    expect(isModeUnlocked(nether(['gold', 'gold', 'diamond', 'diamond']), end)).toBe(true);
+    expect(isModeUnlocked(nether(['gold', 'gold', 'gold', 'stone']), end)).toBe(true);
+    expect(isModeUnlocked(nether(['gold', 'stone', 'gold', 'netherite']), end)).toBe(true);
+    expect(isModeUnlocked(nether(['gold', 'gold', 'iron', 'stone']), end)).toBe(false);
+    expect(isModeUnlocked(nether(['gold', 'gold']), end)).toBe(false);
+    // すすみぐあいは 3 で とまる
+    expect(requirementProgress(nether(['gold', 'gold', 'gold', 'gold']), end)).toEqual({ done: 3, need: 3 });
+  });
+  it('あたらしく ひらいた モードを おしえる', () => {
+    const before = { 'overworld:commands': best('gold') };
+    const after = { ...before, 'overworld:items': best('gold') };
+    expect(newlyUnlocked(before, after)).toEqual([stage(0)]);
+    expect(newlyUnlocked(after, after)).toEqual([]);
+  });
+  it('?unlock の ときは ぜんぶ ひらく', () => {
+    expect(isModeUnlocked({}, end, true)).toBe(true);
   });
   it('まえの きろくの なまえを ひきつぐ', () => {
     const m = migrateBests({ 'practice:items': best('gold'), advanced: best('iron'), intermediate: best('gold'), 'beginner:items': best('gold') });

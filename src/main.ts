@@ -1,11 +1,11 @@
 import './style.css';
-import { GROUPS } from './data/groups';
-import { Mode, NETHER_STAGES, Question, buildQuestions, modeKey, modeLabel, netherStageName, practiceQuestions } from './questions';
+import { GROUPS, getGroup } from './data/groups';
+import { Mode, NETHER_STAGES, Question, buildQuestions, modeKey, modeLabel, netherStageGroups, practiceQuestions } from './questions';
 import { TypingSession } from './session';
 import { highlight, keyboardHtml } from './keyboard';
 import { Best, loadBests, saveBest } from './storage';
 import { RANKS, calcResult } from './result';
-import { Area, CLEAR_RANK_ID, PREV_AREA, areaProgress, isCleared, isUnlocked } from './progress';
+import { Area, CLEAR_RANK_ID, areaProgress, isCleared, isModeUnlocked, newlyUnlocked, requirementProgress, requirements } from './progress';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 
@@ -57,11 +57,17 @@ function showTitle(): void {
     return `<h2><span class="lv">${AREA_NAME[area]}</span> ${sub}<span class="progress">${p.done} / ${p.total} クリア</span></h2>`;
   };
 
-  const lockNote = (area: Area) => {
-    const prev = PREV_AREA[area]!;
-    const p = areaProgress(bests, prev);
-    return `<div class="lock-note">🔒 ${AREA_NAME[prev]}を ぜんぶ ${CLEAR_RANK_NAME}ランク いじょうで クリアすると ひらくよ（いま ${p.done} / ${p.total}）</div>`;
+  /** ロック中の ボタンに だす ひらく じょうけん */
+  const lockHint = (mode: Mode) => {
+    const { candidates } = requirements(mode);
+    const { done, need } = requirementProgress(bests, mode);
+    const what =
+      mode.kind === 'nether'
+        ? `${candidates.map((m) => (m.kind === 'overworld' ? getGroup(m.group).name : '')).join('と ')}を`
+        : `ネザーを ${need}つ いじょう`;
+    return `<span class="lock-hint">🔒 ${what} ${CLEAR_RANK_NAME} いじょうで クリアしてね（${done} / ${need}）</span>`;
   };
+  const isOpen = (mode: Mode) => isModeUnlocked(bests, mode, UNLOCK_ALL);
 
   const overworldButtons = GROUPS.map((g) => {
     const list = practiceQuestions(g.key);
@@ -75,21 +81,21 @@ function showTitle(): void {
       </button>`;
   }).join('');
 
-  const netherOpen = isUnlocked(bests, 'nether', UNLOCK_ALL);
   const netherButtons = NETHER_STAGES.map((s, stage) => {
     const mode: Mode = { kind: 'nether', stage };
-    const [a, b] = s.groups.map((k) => GROUPS.find((g) => g.key === k)!);
+    const open = isOpen(mode);
+    const [a, b] = s.groups.map((k) => getGroup(k));
     return `
-      <button class="group-btn stage-btn" ${modeAttr(mode)} ${netherOpen ? '' : 'disabled'}>
+      <button class="group-btn stage-btn ${open ? '' : 'locked'}" ${modeAttr(mode)} ${open ? '' : 'disabled'}>
         <span class="g-icon">${a.icon}${b.icon}</span>
-        <span class="g-name">ステージ${stage + 1} <span class="g-count">${a.words.length + b.words.length}こ</span></span>
-        <span class="g-desc">${esc(netherStageName(stage))}</span>
-        ${bestBadge(bests, mode)}
+        <span class="g-name">${esc(s.name)} <span class="g-count">${a.words.length + b.words.length}こ</span></span>
+        <span class="g-desc">${esc(netherStageGroups(stage))}</span>
+        ${open ? bestBadge(bests, mode) : lockHint(mode)}
       </button>`;
   }).join('');
 
-  const endOpen = isUnlocked(bests, 'end', UNLOCK_ALL);
   const endMode: Mode = { kind: 'end' };
+  const endOpen = isOpen(endMode);
 
 
   setScreen(
@@ -106,20 +112,18 @@ function showTitle(): void {
       <div class="groups">${overworldButtons}</div>
     </section>
 
-    <section class="panel area area-nether ${netherOpen ? '' : 'locked'}">
+    <section class="panel area area-nether">
       ${areaHead('nether', '2つの グループの ID を まぜて うとう')}
-      ${netherOpen ? '' : lockNote('nether')}
       <div class="groups stages">${netherButtons}</div>
     </section>
 
-    <section class="panel area area-end ${endOpen ? '' : 'locked'}">
+    <section class="panel area area-end">
       ${areaHead('end', 'ほんものの コマンドを くみたてよう')}
-      ${endOpen ? '' : lockNote('end')}
-      <button class="group-btn end-btn" ${modeAttr(endMode)} ${endOpen ? '' : 'disabled'}>
+      <button class="group-btn end-btn ${endOpen ? '' : 'locked'}" ${modeAttr(endMode)} ${endOpen ? '' : 'disabled'}>
         <span class="g-icon">⌨️</span>
         <span class="g-name">コマンド チャレンジ</span>
         <span class="g-desc"><code>/give @p diamond_sword 1</code> <code>/kill @e[type=zombie]</code> …</span>
-        ${bestBadge(bests, endMode)}
+        ${endOpen ? bestBadge(bests, endMode) : lockHint(endMode)}
       </button>
     </section>
     `,
@@ -264,16 +268,16 @@ function showPlay(mode: Mode): void {
 function showResult(mode: Mode, session: TypingSession): void {
   const r = calcResult(session);
   const key = modeKey(mode);
-  const areas: Area[] = ['nether', 'end'];
   const before = loadBests();
   const wasCleared = isCleared(before, mode);
   const isBest = saveBest(key, { score: r.score, rankId: r.rank.id, kpm: Math.round(r.kpm), accuracy: r.accuracy });
   const after = loadBests();
-  const newlyOpened = areas.filter((a) => !isUnlocked(before, a) && isUnlocked(after, a));
+  const newlyOpened = newlyUnlocked(before, after);
 
   let clearMsg = '';
   if (newlyOpened.length) {
-    clearMsg = newlyOpened.map((a) => `<div class="unlock">🎉 ${AREA_NAME[a]}が ひらいた! 🎉</div>`).join('');
+    const name = (m: Mode) => (m.kind === 'nether' ? `ネザーの「${NETHER_STAGES[m.stage].name}」` : 'エンドシティ');
+    clearMsg = newlyOpened.map((m) => `<div class="unlock">🎉 ${name(m)}が ひらいた! 🎉</div>`).join('');
   } else if (isCleared(after, mode) && !wasCleared) {
     clearMsg = '<div class="cleared">✔ クリア!</div>';
   } else if (!isCleared(after, mode)) {

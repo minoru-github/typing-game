@@ -30,13 +30,39 @@ export function areaProgress(bests: Record<string, Best>, area: Area): { done: n
   return { done: modes.filter((m) => isCleared(bests, m)).length, total: modes.length };
 }
 
-/** そのエリアに ひとつ まえの エリア */
-export const PREV_AREA: Record<Area, Area | null> = { overworld: null, nether: 'overworld', end: 'nether' };
+/** エンドシティを ひらくのに クリアが ひつような ネザーの ステージの かず */
+export const END_REQUIRED_NETHER = 3;
 
-export function isUnlocked(bests: Record<string, Best>, area: Area, unlockAll = false): boolean {
+/**
+ * そのモードを ひらく じょうけん：candidates のうち need こ いじょうを クリア
+ * - ネザーの ステージ：おなじ 2グループの オーバーワールドを 2つとも
+ * - エンドシティ：ネザーの ステージを 3つ いじょう
+ */
+export function requirements(mode: Mode): { candidates: Mode[]; need: number } {
+  if (mode.kind === 'overworld') return { candidates: [], need: 0 };
+  if (mode.kind === 'nether') {
+    const candidates: Mode[] = NETHER_STAGES[mode.stage].groups.map((group) => ({ kind: 'overworld', group }));
+    return { candidates, need: candidates.length };
+  }
+  return { candidates: areaModes('nether'), need: END_REQUIRED_NETHER };
+}
+
+/** ひらく じょうけんの すすみぐあい（done は need を こえない） */
+export function requirementProgress(bests: Record<string, Best>, mode: Mode): { done: number; need: number } {
+  const { candidates, need } = requirements(mode);
+  const cleared = candidates.filter((m) => isCleared(bests, m)).length;
+  return { done: Math.min(cleared, need), need };
+}
+
+export function isModeUnlocked(bests: Record<string, Best>, mode: Mode, unlockAll = false): boolean {
   if (unlockAll) return true;
-  const prev = PREV_AREA[area];
-  if (!prev) return true;
-  const p = areaProgress(bests, prev);
-  return isUnlocked(bests, prev) && p.done === p.total;
+  const { done, need } = requirementProgress(bests, mode);
+  return done >= need;
+}
+
+/** before → after で あたらしく ひらいた モード */
+export function newlyUnlocked(before: Record<string, Best>, after: Record<string, Best>): Mode[] {
+  return [...areaModes('nether'), ...areaModes('end')].filter(
+    (m) => !isModeUnlocked(before, m) && isModeUnlocked(after, m),
+  );
 }

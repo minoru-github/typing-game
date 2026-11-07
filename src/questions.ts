@@ -11,14 +11,15 @@ export type Mode =
   | { kind: 'nether'; stage: number }
   | { kind: 'end' };
 
-export const NETHER_STAGES: readonly { groups: readonly [GroupKey, GroupKey] }[] = [
-  { groups: ['commands', 'gamerules'] },
-  { groups: ['items', 'blocks'] },
-  { groups: ['entities', 'biomes'] },
-  { groups: ['effects', 'enchantments'] },
+export const NETHER_STAGES: readonly { name: string; groups: readonly [GroupKey, GroupKey] }[] = [
+  { name: '真紅の森', groups: ['commands', 'items'] },
+  { name: '歪んだ森', groups: ['blocks', 'entities'] },
+  { name: 'ネザーの荒野', groups: ['effects', 'enchantments'] },
+  { name: 'ソウルサンドの谷', groups: ['biomes', 'gamerules'] },
 ];
 
-export const netherStageName = (stage: number): string =>
+/** ステージで まぜる グループ（例：コマンド ＋ アイテム） */
+export const netherStageGroups = (stage: number): string =>
   NETHER_STAGES[stage].groups.map((k) => getGroup(k).name).join(' ＋ ');
 
 export interface Question {
@@ -52,7 +53,7 @@ export function modeKey(mode: Mode): string {
 
 export function modeLabel(mode: Mode): string {
   if (mode.kind === 'overworld') return `オーバーワールド：${getGroup(mode.group).name}`;
-  if (mode.kind === 'nether') return `ネザー：${netherStageName(mode.stage)}`;
+  if (mode.kind === 'nether') return `ネザー：${NETHER_STAGES[mode.stage].name}（${netherStageGroups(mode.stage)}）`;
   return 'エンドシティ：コマンドを くみたてよう';
 }
 
