@@ -25,6 +25,12 @@ npm test         # データとロジックのテスト
 - 日本語入力がオンのとき・CapsLock がオンのときは警告を出します
 - 結果はスコアでランク（ウッド〜ネザライト）がつき、苦手なキーを表示します。自己ベストはブラウザに保存されます
 
+## 公開（GitHub Pages）
+
+main に push すると、GitHub Actions（`.github/workflows/deploy.yml`）がテストとビルドを行い、
+https://minoru-github.github.io/typing-game/ に公開します。
+テストが失敗したときは公開されません。
+
 ## 単語グループ
 
 `src/data/groups.ts` で編集できます。
