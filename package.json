@@ -1,0 +1,18 @@
+{
+  "name": "craft-typing",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "~5.4.5",
+    "vite": "~4.5.3",
+    "vite-plugin-singlefile": "^0.13.5",
+    "vitest": "~0.34.6"
+  }
+}
