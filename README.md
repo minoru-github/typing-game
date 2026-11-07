@@ -42,3 +42,10 @@ https://minoru-github.github.io/typing-game/ に公開します。
 - ゲームルール（`keepinventory` … 統合版は小文字表記）
 
 エンドシティのコマンド文のテンプレートは `src/questions.ts` の `TEMPLATES` にあります。
+
+## ライセンス
+
+[MIT License](LICENSE)
+
+このゲームは非公式のファン作品で、Mojang Studios や Microsoft とは関係ありません。
+Minecraft は Mojang Synergies AB の商標です。

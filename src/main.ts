@@ -96,7 +96,6 @@ function showTitle(): void {
     `
     <header class="hero">
       <h1><span class="block grass"></span>クラフト タイピング</h1>
-      <p>マイクラ統合版の コマンドや ID を うって、タイピング名人を めざそう!</p>
     </header>
 
     <p class="note">※ ゲームの まえに にほんご にゅうりょくを オフ（えいすう）に してね。</p>
