@@ -5,7 +5,7 @@ import { TypingSession } from './session';
 import { highlight, keyboardHtml } from './keyboard';
 import { Best, loadBests, saveBest } from './storage';
 import { RANKS, calcResult } from './result';
-import { Area, CLEAR_RANK_ID, areaProgress, isCleared, isModeUnlocked, newlyUnlocked, requirementProgress, requirements } from './progress';
+import { Area, CLEAR_RANK_ID, areaProgress, isCleared, isModeUnlocked, newlyUnlocked } from './progress';
 
 const app = document.querySelector<HTMLDivElement>('#app')!;
 
@@ -52,21 +52,11 @@ function showTitle(): void {
   const modes: Mode[] = [];
   const modeAttr = (m: Mode) => `data-m="${modes.push(m) - 1}"`;
 
-  const areaHead = (area: Area, sub: string) => {
+  const areaHead = (area: Area) => {
     const p = areaProgress(bests, area);
-    return `<h2><span class="lv">${AREA_NAME[area]}</span> ${sub}<span class="progress">${p.done} / ${p.total} クリア</span></h2>`;
+    return `<h2><span class="lv">${AREA_NAME[area]}</span><span class="progress">${p.done} / ${p.total} クリア</span></h2>`;
   };
 
-  /** ロック中の ボタンに だす ひらく じょうけん */
-  const lockHint = (mode: Mode) => {
-    const { candidates } = requirements(mode);
-    const { done, need } = requirementProgress(bests, mode);
-    const what =
-      mode.kind === 'nether'
-        ? `${candidates.map((m) => (m.kind === 'overworld' ? getGroup(m.group).name : '')).join('と ')}を`
-        : `ネザーを ${need}つ いじょう`;
-    return `<span class="lock-hint">🔒 ${what} ${CLEAR_RANK_NAME} いじょうで クリアしてね（${done} / ${need}）</span>`;
-  };
   const isOpen = (mode: Mode) => isModeUnlocked(bests, mode, UNLOCK_ALL);
 
   const overworldButtons = GROUPS.map((g) => {
@@ -90,7 +80,7 @@ function showTitle(): void {
         <span class="g-icon">${a.icon}${b.icon}</span>
         <span class="g-name">${esc(s.name)} <span class="g-count">${a.words.length + b.words.length}こ</span></span>
         <span class="g-desc">${esc(netherStageGroups(stage))}</span>
-        ${open ? bestBadge(bests, mode) : lockHint(mode)}
+        ${bestBadge(bests, mode)}
       </button>`;
   }).join('');
 
@@ -107,23 +97,23 @@ function showTitle(): void {
     <p class="note">※ ゲームの まえに にほんご にゅうりょくを オフ（えいすう）に してね。</p>
 
     <section class="panel area area-overworld">
-      ${areaHead('overworld', '「_」の ない みじかい ことば')}
+      ${areaHead('overworld')}
       <p class="lead"><code>diamond_sword</code> → <code>diamond</code> と <code>sword</code> に わけて うつよ</p>
       <div class="groups">${overworldButtons}</div>
     </section>
 
     <section class="panel area area-nether">
-      ${areaHead('nether', '2つの グループの ID を まぜて うとう')}
+      ${areaHead('nether')}
       <div class="groups stages">${netherButtons}</div>
     </section>
 
     <section class="panel area area-end">
-      ${areaHead('end', 'ほんものの コマンドを くみたてよう')}
+      ${areaHead('end')}
       <button class="group-btn end-btn ${endOpen ? '' : 'locked'}" ${modeAttr(endMode)} ${endOpen ? '' : 'disabled'}>
         <span class="g-icon">⌨️</span>
         <span class="g-name">コマンド チャレンジ</span>
         <span class="g-desc"><code>/give @p diamond_sword 1</code> <code>/kill @e[type=zombie]</code> …</span>
-        ${endOpen ? bestBadge(bests, endMode) : lockHint(endMode)}
+        ${bestBadge(bests, endMode)}
       </button>
     </section>
     `,
